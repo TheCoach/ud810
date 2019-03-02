@@ -1,51 +1,51 @@
-function R = compute_harris_value(gx, gy, varargin)
+function R = compute_harris_value(imgGray, varargin)
     p = inputParser;
-    p.addRequired('gx', @(x) size(x, 3) == 1);
-    p.addRequired('gy', @(x) size(x, 3) == 1);
+    p.addRequired('imgGray', @(x) size(x, 3) == 1);
     p.addOptional('windowSize', 5, @(x) floor(x) == x && mod(x, 2) == 1);
     p.addOptional('alpha', 0.04, @(x) isnumeric(x) && x > 0);
     
-    p.parse(gx, gy, varargin{:});
+    p.parse(imgGray, varargin{:});
     alpha = p.Results.alpha;
     wSz = p.Results.windowSize;
 
-    if ~isequal(size(gx), size(gy))
-        error('gx and gy must be of the same size.');
-    end
     halfWsz = (wSz - 1) / 2;
+    imgGray = double(imgGray);
+    
+    f_g = fspecial('gaussian');
+    [dgx, dgy] = imgradientxy(f_g);
 
-    gx = padarray(gx, [halfWsz halfWsz], 'replicate');
-    gy = padarray(gy, [halfWsz halfWsz], 'replicate');
+    gx = imfilter(imgGray, dgx, 'conv');
+    gy = imfilter(imgGray, dgy, 'conv');
+
+    gxx = gx .^ 2;
+    gxy = gx .* gy;
+    gyy = gy .^ 2;
+
+    w = fspecial('gaussian', wSz);
 
     R = zeros(size(gx));
 
     for r = halfWsz + 1 : size(gx, 1) - halfWsz
-        printf('working on row %d ...\n', r);
+        if mod(r, 20) == 0
+            printf('Processing row %d/%d\n', r, size(imgGray, 1));
+        end
         for c = halfWsz + 1 : size(gx, 2) - halfWsz
-            w_Gx = gx(r - halfWsz : r + halfWsz, c - halfWsz : c + halfWsz); 
-            w_Gy = gy(r - halfWsz : r + halfWsz, c - halfWsz : c + halfWsz);
-            M = compute_M(w_Gx, w_Gy, wSz);
+            wGxx = gxx(r - halfWsz : r + halfWsz, c - halfWsz : c + halfWsz); 
+            wGxy = gxy(r - halfWsz : r + halfWsz, c - halfWsz : c + halfWsz);
+            wGyx = gxy(r - halfWsz : r + halfWsz, c - halfWsz : c + halfWsz);
+            wGyy = gyy(r - halfWsz : r + halfWsz, c - halfWsz : c + halfWsz);
+
+            Mxx = sum((w .* wGxx)(:));
+            Mxy = sum((w .* wGxy)(:));
+            Myx = sum((w .* wGyx)(:));
+            Myy = sum((w .* wGyy)(:));
+
+            M = [Mxx, Mxy; Myx, Myy];
+
             R(r, c) = det(M) - alpha * (trace(M) ^ 2);
-            %{
-                R < 0, edge
-                large R > 0, corner
-                magnitude(R) small, flat region
-            %}
         end
     end
 
     R = R(halfWsz + 1 : size(R, 1) - halfWsz, halfWsz + 1 : size(R, 2) - halfWsz);
     R(find(R < 0)) = 0;
 end
-
-function M = compute_M(w_Gx, w_Gy)
-    M = zeros(2);
-    w = fspecial('gaussian', size(w_Gx));
-    for r = 1 : size(w_Gx, 1)
-        for c = 1 : size(w_Gx, 2)
-            M += w(r, c) .* ...
-                  [w_Gx(r, c) ^ 2, w_Gx(r, c) * w_Gy(r, c); ...
-                  w_Gx(r, c) * w_Gy(r, c), w_Gy(r, c) ^ 2];
-        end
-    end
-endfunction
