@@ -201,13 +201,13 @@ def p4_b():
     cv.imwrite(os.path.join('output', 'ps5-4-b-4.png'), cv.subtract(i2, warped_i3))
 
 def p4_c():
-    i1 = cv.GaussianBlur(cv.imread(os.path.join('input', 'DataSeq2', '0.png'), cv.IMREAD_GRAYSCALE), (5, 5), 0)
-    i2 = cv.GaussianBlur(cv.imread(os.path.join('input', 'DataSeq2', '1.png'), cv.IMREAD_GRAYSCALE), (5, 5), 0)
-    i3 = cv.GaussianBlur(cv.imread(os.path.join('input', 'DataSeq2', '2.png'), cv.IMREAD_GRAYSCALE), (5, 5), 0)
+    i1 = cv.imread(os.path.join('input', 'DataSeq2', '0.png'), cv.IMREAD_GRAYSCALE)
+    i2 = cv.imread(os.path.join('input', 'DataSeq2', '1.png'), cv.IMREAD_GRAYSCALE)
+    i3 = cv.imread(os.path.join('input', 'DataSeq2', '2.png'), cv.IMREAD_GRAYSCALE)
 
-    u2,v2 = lk.hi_lk(i1, i2, 10)
+    u2,v2 = lk.hi_lk(i1, i2, 10, window_size=11)
     flow2 = lk.draw_flow_hsv(u2, v2)
-    u3,v3 = lk.hi_lk(i2, i3, 10)
+    u3,v3 = lk.hi_lk(i2, i3, 10, window_size=11)
     flow3 = lk.draw_flow_hsv(u3, v3)
     warped_i2 = lk.warp(i2, u2, v2)
     warped_i3 = lk.warp(i3, u3, v3)
