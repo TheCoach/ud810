@@ -217,8 +217,7 @@ def p4_c():
     cv.imwrite(os.path.join('output', 'ps5-4-c-4.png'), cv.subtract(i2, warped_i3))
 
 def main(argv):
-    p3_a()
-    p3_b()
+    p4_c()
 
 if __name__ == '__main__':
     main(sys.argv[1:])

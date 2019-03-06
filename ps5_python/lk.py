@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
 import math
+import logging
 
 def basic_lk(gray_img_1, gray_img_2, window_size = 5, t = 0.1):
     if (gray_img_1.ndim != 2 or gray_img_2.ndim != 2):
@@ -54,7 +55,7 @@ def basic_lk(gray_img_1, gray_img_2, window_size = 5, t = 0.1):
 
     return u, v
 
-def hi_lk(img_1, img_2, n):
+def hi_lk(img_1, img_2, n, window_size = 5):
     if (math.floor(n) != n):
         raise Exception('n must be an integer')
 
@@ -66,7 +67,7 @@ def hi_lk(img_1, img_2, n):
 
     max_levels = math.floor(math.log(min(img_1.shape[0], img_1.shape[1])/2, 2))
     if (n > max_levels):
-        print(f'n ({n}) is too big, overwrite to {max_levels}')
+        print(f'hi_lk(), {__file__}: n ({n}) is too big, overwrite to {max_levels}')
 
     n = max_levels
 
@@ -87,12 +88,15 @@ def hi_lk(img_1, img_2, n):
             u = 2 * cv.pyrUp(u, dstsize = (w, h))
             v = 2 * cv.pyrUp(v, dstsize = (w, h))
         wk = warp(g_img_1[k], u, v)
-        dx, dy = basic_lk(wk, g_img_2[k])
+        dx, dy = basic_lk(wk, g_img_2[k], window_size)
         u = u + dx
         v = v + dy
 
     return u, v;
 
+'''
+The  two visulisation methods are borrowed from OpenCV tutorial
+'''
 def draw_flow_grid(img, u, v, step = 16):
     # scale displacements to be visible
     u = 5 * u
