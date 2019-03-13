@@ -1,4 +1,5 @@
 from mhi import MhiConstructor
+from plot_confusion_matrix import plot_confusion_matrix
 
 import sys, traceback
 import os.path
@@ -84,7 +85,7 @@ def run_mhi(vpath, frames_to_save, part_str, diff_threshold, gaussian_blur_size 
     mom = mhi_ctor.compute_central_normalized_moments()
     return ActivityDescriptor(mhi, tao, mom)
 
-def train_data():
+def calculate_descriptors():
     data = {}
     for filename in os.listdir('input'):
         if filename.startswith('PS7') and filename.endswith('.avi'):
@@ -118,50 +119,59 @@ def compare_moments(h1, h2):
     d = np.linalg.norm(h1 - h2)
     return d
 
-'''
-   3 x 3, r (row) is (action - 1), j (column) is (trial - 1)
-'''
-def build_confusion_matrix(dict_of_moments, mom):
-    if (len(dict_of_moments) != 9):
-        raise ValueError('dict_of_moments is not valid')
-
-    ret = np.zeros((3,3), dtype = np.float64)
-    for seq, m in dict_of_moments.items():
-        _, a, p, t = re.split('[pat]', seq.lower())
-        a, p, t = map(int, [a, p, t])
-        ret[a - 1, t - 1] = compare_moments(m, mom)
-    return ret
-
-def evaluate(data):
+def evaluate_knn(data):
     for p in range(1, 4): # each person
+        train_data = []
+        train_label = []
         for a in range(1, 4): # each action
-            print('#############################################')
-            print(f'Evaluate Action#{a} against Person#{p}')
             # get all action moments excluding Person-p
             action_mom = filter_property(filter_seq(data, 'a' + str(a), 'p' + str(p)), 'mom')
-            person_mom = filter_property(filter_seq(data, 'p' + str(p)), 'mom')
+            train_data.extend(action_mom.values())
+            train_label.extend([a] * len(action_mom))
+        train_data = np.array(train_data, dtype = np.float32)
+        train_label = np.array(train_label, dtype = np.int)
 
-            avg_mom = np.zeros((14,), dtype = np.float64)
-            for m in action_mom.values():
-                avg_mom += m
-            avg_mom /= len(action_mom)
+        person_mom = filter_property(filter_seq(data, 'p' + str(p)), 'mom')
+        test_data = []
+        test_label = []
+        for seq, m in person_mom.items(): # each action
+            _, a, _, _ = re.split('[pat]', seq.lower())
+            a = int(a)
+            test_data.append(m)
+            test_label.append(a)
 
-            cmat = build_confusion_matrix(person_mom, avg_mom)
+        test_data = np.array(test_data, dtype = np.float32)
+        test_label = np.array(test_label, dtype = np.int)
 
-            minindex = np.argmin(cmat, axis = 0)
-            targetindex = np.array([a-1, a-1, a-1])
-            if(not np.array_equal(minindex, targetindex)):
-                print('XXX Evaluation failed XXX')
-                print(cmat)
-                print(minindex)
-            else:
-                print('YYY Evaluation passed YYY')
-            print('#############################################\n')
+        cmat = np.zeros((3,3))
+        print('#############################################')
+        print(f'Evaluate against Person#{p}')
+
+        knn = cv.ml.KNearest_create()
+        knn.train(train_data, cv.ml.ROW_SAMPLE, train_label)
+        ret, results, neighbours ,dist = knn.findNearest(test_data, 1)
+
+        print( "result:  {}\n".format(results.reshape(len(test_label), ).astype(np.int)))
+        print( "neighbours:  {}\n".format(neighbours.reshape(len(test_label), )))
+        print( "distance:  {}\n".format(dist.reshape(len(test_label), )))
+
+        # for true, pred in zip (test_label - 1, results.reshape(len(test_label), ).astype(np.int) - 1):
+        #     cmat[true, pred] += 1
+
+        # plot confusion matrix based on classification results of k-NN
+        plot_confusion_matrix(test_label.astype(np.int),
+                              results.reshape(len(test_label), ).astype(np.int),
+                              classes=['action1','action2','action3'],
+                              normalize=False,
+                              title=f'Confusion Matrix Against Person {p}',
+                              save_to_file=os.path.join('output', f'ps7-2-b-{p}.png'))
+        print('#############################################\n')
+
 
 def main(argv):
     try:
-        data = train_data()
-        evaluate(data)
+        data = calculate_descriptors()
+        evaluate_knn(data)
     except RuntimeError as rte:
         print(f'MHI failed to run: {rte}')
         print(traceback.print_tb(rte.__traceback__))
